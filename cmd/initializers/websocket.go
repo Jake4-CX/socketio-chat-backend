@@ -34,7 +34,6 @@ func getConnectedUser(socketId string) (*structs.User, error) {
 func onConnection(socket *socketio.Socket) {
 	log.Info("New connection from: ", socket.Id)
 
-	// We need the user's username. The usernames must be unique (no other user connected can have the same username)
 	socket.On("authenticate", func(event *socketio.EventPayload) {
 		if len(event.Data) > 0 && event.Data[0] != nil {
 			username := event.Data[0].(string)
@@ -61,7 +60,6 @@ func onConnection(socket *socketio.Socket) {
 				Rooms: AvailableRooms,
 			}
 
-			// return success - the user is now authenticated - user information returned
 			socket.Emit("authenticated", authenticatedResponse)
 		}
 	})
@@ -75,7 +73,6 @@ func onConnection(socket *socketio.Socket) {
 
 		if len(event.Data) > 0 && event.Data[0] != nil {
 			room := event.Data[0].(string)
-			log.Info("Join room: ", room)
 
 			// check if the room exists
 			if !slices.Contains(AvailableRooms, room) {
@@ -90,7 +87,6 @@ func onConnection(socket *socketio.Socket) {
 	})
 
 	socket.On("leaveRoom", func(event *socketio.EventPayload) {
-		// no body needed
 
 		if len(socket.Rooms()) == 0 {
 			socket.Emit("error", "You are not in any rooms")
@@ -98,10 +94,9 @@ func onConnection(socket *socketio.Socket) {
 		}
 
 		// Make sure the user is in the room
-		rooms := socket.Rooms()
 		foundRoom := ""
 
-		for _, room := range rooms {
+		for _, room := range socket.Rooms() {
 			if slices.Contains(AvailableRooms, room) {
 				foundRoom = room
 				break
@@ -113,8 +108,6 @@ func onConnection(socket *socketio.Socket) {
 			return
 		}
 
-
-		log.Info("Leave room: ", foundRoom)
 		socket.Leave(foundRoom)
 		socket.Emit("leftRoom", foundRoom)
 	})
@@ -130,7 +123,6 @@ func onConnection(socket *socketio.Socket) {
 
 		if len(event.Data) > 0 && event.Data[0] != nil {
 			message := event.Data[0].(string)
-			log.Info("Message: ", message)
 
 			messageResponse := &structs.MessageResponse{
 				User:        user,
@@ -138,10 +130,9 @@ func onConnection(socket *socketio.Socket) {
 				ProcessedAt: time.Now(),
 			}
 
-			// get the room the user is in
+			// send message to all rooms that the user is in
 			rooms := socket.Rooms()
 			for _, room := range rooms {
-				// broadcast the message to all users in the room
 				socket.To(room).Emit("message", messageResponse)
 			}
 		}
@@ -150,7 +141,7 @@ func onConnection(socket *socketio.Socket) {
 	socket.On("disconnect", func(event *socketio.EventPayload) {
 		log.Info("Disconnect: ", socket.Id)
 
-		// Remove the user from the list of connected users
+		// Remove the user from list of connected users
 		for i, user := range ConnectedUsers {
 			if user.SocketId == socket.Id {
 				ConnectedUsers = append(ConnectedUsers[:i], ConnectedUsers[i+1:]...)
